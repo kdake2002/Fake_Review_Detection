@@ -1,46 +1,37 @@
 import pandas as pd
-import re
 import pickle
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.linear_model import LogisticRegression
 from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics import classification_report
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
 
-# Load data
-df = pd.read_csv("data/reviews_dataset_5000.csv")
+# Load dataset
+df = pd.read_csv("reviews_dataset_5000.csv")
+
+# Drop rows with null review or label
 df = df.dropna(subset=["review", "label"])
 
-# Feature engineering
-df["review_length"] = df["review"].apply(len)
-df["exclamation_count"] = df["review"].apply(lambda x: x.count("!"))
-
-# Label encoding
+# Encode labels: genuine = 1, fake = 0
 df["label"] = df["label"].map({"genuine": 1, "fake": 0})
 
-# Split
-X = df[["review", "review_length", "exclamation_count"]]
+# Split into features and target
+X = df["review"]
 y = df["label"]
 
-# Vectorize text only
-vectorizer = CountVectorizer(max_features=5000)
-X_vec = vectorizer.fit_transform(X["review"])
+# Define pipeline: CountVectorizer + Logistic Regression
+model = Pipeline([
+    ("vectorizer", CountVectorizer(max_features=3000)),
+    ("classifier", LogisticRegression())
+])
 
-# Combine with numeric features
-import scipy
-X_full = scipy.sparse.hstack((X_vec, X[["review_length", "exclamation_count"]].values))
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Train-test split
-X_train, X_test, y_train, y_test = train_test_split(X_full, y, test_size=0.2, random_state=42)
-
-# Model
-model = LogisticRegression()
+# Train model
 model.fit(X_train, y_train)
 
-# Save model and vectorizer
-pickle.dump(model, open("model/model.pkl", "wb"))
-pickle.dump(vectorizer, open("model/vectorizer.pkl", "wb"))
+# Save model to disk
+with open("model.pkl", "wb") as f:
+    pickle.dump(model, f)
 
-# Evaluation
-y_pred = model.predict(X_test)
-print(classification_report(y_test, y_pred))
+print("✅ Model trained and saved as model.pkl")
